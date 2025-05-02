@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SnapiPOS Inventory Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
+    <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">🔐 SnapiPOS Login</h2>
+    <div id="message" class="text-center text-red-600 mb-4"></div>
+    <div class="space-y-4">
+      <input type="text" id="username" placeholder="Username" class="w-full border rounded px-4 py-2" />
+      <input type="password" id="password" placeholder="Password" class="w-full border rounded px-4 py-2" />
+      <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded">Login</button>
+      <button onclick="register()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Register</button>
+    </div>
+  </div>
+
+  <script>
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      document.getElementById("message").textContent = data.message;
+      if (data.success) {
+        window.location.href = "/dashboard.html";
+      }
+    }
+
+    async function register() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      document.getElementById("message").textContent = data.message;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SnapiPOS Inventory</title>
+  <script src="https://cdn.tailwindcss.com">
+    async function logout() {
+      const res = await fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = "/";
+      } else {
+        alert("Logout failed");
+      }
+    }
+</script>
+
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="max-w-5xl mx-auto p-6 space-y-6">
+    <header class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-800">📦 Inventory Management</h1>
+        <p class="text-sm text-gray-500">Upload stock, add products and manage inventory</p>
+      </div>
+      <div class="flex gap-2 items-center"><a href="/dashboard.html" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">🔙 Back</a><button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">🚪 Logout</button></div>
+    </header>
+
+    <section class="bg-white shadow-md rounded-lg p-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-semibold">📊 Inventory</h2>
+        <button onclick="loadInventory()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">🔍 View</button>
+      </div>
+      <div id="error-msg" class="text-red-600 mt-2"></div>
+      <div class="overflow-x-auto mt-4 w-full">
+        <table id="inventory-table" class="min-w-full table-auto hidden">
+          <thead class="bg-gray-200">
+            <tr>
+              <th class="px-4 py-2 text-left">Product</th>
+              <th class="px-4 py-2 text-left">Category</th>
+              <th class="px-4 py-2 text-left">SKU</th>
+              <th class="px-4 py-2 text-left">Qty</th>
+              <th class="px-4 py-2 text-left">Image</th>
+              <th class="px-4 py-2 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="bg-white"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-4">
+      <h2 class="text-xl font-semibold mb-3">📤 Upload Stock via CSV</h2>
+      <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="csvFile" accept=".csv" required class="mb-2 block w-full" />
+        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Upload</button>
+      </form>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-4">
+      <h2 class="text-xl font-semibold mb-3">➕ Add Product</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input id="newName" placeholder="Product Name" class="border px-3 py-2 rounded w-full" />
+        <input id="newCategory" placeholder="Category" class="border px-3 py-2 rounded w-full" />
+        <input id="newSKU" placeholder="SKU" class="border px-3 py-2 rounded w-full" />
+        <input id="newQty" type="number" placeholder="Quantity" class="border px-3 py-2 rounded w-full" />
+        <input id="newImg" placeholder="Image URL (optional)" class="border px-3 py-2 rounded md:col-span-2" />
+      </div>
+      <button onclick="addProduct()" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded">Add</button>
+    </section>
+  </div>
+
+  <script>
+    async function loadInventory() {
+      const res = await fetch('/inventory', { credentials: 'include' });
+      const data = await res.json();
+      const table = document.getElementById('inventory-table');
+      const tbody = document.getElementById('table-body');
+      const errorMsg = document.getElementById('error-msg');
+
+      if (!Array.isArray(data)) {
+        errorMsg.textContent = data.message || 'Error loading inventory.';
+        return;
+      }
+
+      errorMsg.textContent = '';
+      tbody.innerHTML = '';
+      data.forEach(item => {
+        const tr = document.createElement('tr');
+        const image = item.image_path ? item.image_path : 'https://via.placeholder.com/60?text=No+Image';
+        tr.innerHTML = `
+          <td class='px-4 py-2'>${item.product_name}</td>
+          <td class='px-4 py-2'>${item.category}</td>
+          <td class='px-4 py-2'>${item.sku}</td>
+          <td class='px-4 py-2'>${item.quantity}</td>
+          <td class='px-4 py-2'><img src="${image}" class="w-12 h-auto" /></td>
+          <td class='px-4 py-2'>
+            <button onclick="deleteProduct('${item.sku}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded">🗑️</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      table.classList.remove('hidden');
+    }
+
+    async function addProduct() {
+      const body = {
+        product_name: document.getElementById('newName').value,
+        category: document.getElementById('newCategory').value,
+        sku: document.getElementById('newSKU').value,
+        quantity: parseInt(document.getElementById('newQty').value),
+        image_path: document.getElementById('newImg').value || ''
+      };
+      const res = await fetch('/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body)
+      });
+      const result = await res.json();
+      alert(result.message);
+      loadInventory();
+    }
+
+    async function deleteProduct(sku) {
+      if (!confirm(`Delete item with SKU ${sku}?`)) return;
+      const res = await fetch(`/delete?sku=${sku}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const result = await res.json();
+      alert(result.message);
+      loadInventory();
+    }
+
+    document.getElementById('upload-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const response = await fetch('/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert('Stock uploaded successfully.');
+        loadInventory();
+      } else {
+        alert('Upload failed: ' + result.message);
+      }
+    });
+  
+    async function logout() {
+      const res = await fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = "/";
+      } else {
+        alert("Logout failed");
+      }
+    }
+</script>
+
+</body>
+</html>

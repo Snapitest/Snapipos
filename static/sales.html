@@ -1,0 +1,197 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SnapiPOS Sales</title>
+  <script src="https://cdn.tailwindcss.com">
+    async function logout() {
+      const res = await fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = "/";
+      } else {
+        alert("Logout failed");
+      }
+    }
+
+    document.getElementById('image-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('productImage');
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const filename = file.name.toLowerCase();
+      const knownSKUs = ['sunlight', 'maize', 'coke', 'cola', 'soap', 'cc2l002', 'mm5kg001'];
+
+      let match = knownSKUs.find(sku => filename.includes(sku));
+      if (match) {
+        document.getElementById('checkoutSku').value = match.toUpperCase();
+        document.getElementById('scan-result').textContent = `Matched to SKU: ${match.toUpperCase()}`;
+      } else {
+        document.getElementById('scan-result').textContent = 'No match found.';
+      }
+    });
+
+</script>
+
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="max-w-5xl mx-auto p-6 space-y-6">
+    <header class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-800">💰 Sales Management</h1>
+        <p class="text-sm text-gray-500">Checkout items and view sales history</p>
+      </div>
+      <div class="flex gap-2 items-center"><a href="/dashboard.html" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">🔙 Back</a><button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">🚪 Logout</button></div>
+    </header>
+
+    
+    <section class="bg-white shadow-md rounded-lg p-4">
+      <h2 class="text-xl font-semibold mb-3">📸 Scan Item by Image</h2>
+      <form id="image-form" class="flex flex-col md:flex-row gap-4 items-center" enctype="multipart/form-data">
+        <input type="file" id="productImage" accept="image/*" class="border px-3 py-2 rounded w-full md:w-auto" required />
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Scan Image</button>
+      </form>
+      <p id="scan-result" class="mt-2 text-sm text-gray-600"></p>
+    </section>
+
+<section class="bg-white shadow-md rounded-lg p-4">
+      <h2 class="text-xl font-semibold mb-3">🛒 Checkout</h2>
+      <div class="flex flex-col md:flex-row md:items-center gap-4">
+        <input type="text" id="checkoutSku" placeholder="Enter SKU to checkout" class="border px-3 py-2 rounded w-full" />
+        <button onclick="checkoutItem()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Checkout</button>
+      </div>
+      <p id="checkout-result" class="mt-2 text-sm text-green-600"></p>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-semibold">📆 Sales History</h2>
+        <button onclick="loadSales()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">📋 View Sales</button>
+      </div>
+      <div class="flex justify-end gap-4 mt-4">
+        <button onclick="exportSalesCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">📤 Export CSV</button>
+        <button onclick="printSales()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">🖨️ Print</button>
+      </div>
+      <div id="sales-error" class="text-red-600 mt-2"></div>
+      <div class="overflow-x-auto mt-4 w-full">
+        <table id="sales-table" class="min-w-full table-auto hidden">
+          <thead class="bg-gray-200">
+            <tr>
+              <th class="px-4 py-2 text-left">SKU</th>
+              <th class="px-4 py-2 text-left">User</th>
+              <th class="px-4 py-2 text-left">Qty</th>
+              <th class="px-4 py-2 text-left">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="sales-body" class="bg-white"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    async function checkoutItem() {
+      const sku = document.getElementById('checkoutSku').value;
+      const res = await fetch(`/checkout?sku=${sku}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const result = await res.json();
+      document.getElementById('checkout-result').textContent = result.message;
+      loadSales();
+    }
+
+    async function loadSales() {
+      try {
+        const res = await fetch('/sales', { credentials: 'include' });
+        const data = await res.json();
+        const table = document.getElementById('sales-table');
+        const tbody = document.getElementById('sales-body');
+        const error = document.getElementById('sales-error');
+
+        if (!Array.isArray(data)) {
+          error.textContent = data.message || 'Error loading sales history.';
+          return;
+        }
+
+        error.textContent = '';
+        tbody.innerHTML = '';
+        data.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class='px-4 py-2'>${item.sku}</td>
+            <td class='px-4 py-2'>${item.username}</td>
+            <td class='px-4 py-2'>${item.quantity}</td>
+            <td class='px-4 py-2'>${new Date(item.timestamp).toLocaleString()}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        table.classList.remove('hidden');
+      } catch (e) {
+        document.getElementById('sales-error').textContent = 'Failed to load sales: ' + e.message;
+      }
+    }
+
+    function exportSalesCSV() {
+      const rows = [['SKU', 'User', 'Quantity', 'Timestamp']];
+      document.querySelectorAll('#sales-body tr').forEach(tr => {
+        const cols = [...tr.children].map(td => td.textContent);
+        rows.push(cols);
+      });
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'sales_log.csv';
+      a.click();
+    }
+
+    function printSales() {
+      const win = window.open('', '_blank');
+      const html = document.getElementById('sales-table').outerHTML;
+      win.document.write('<html><head><title>Print Sales Report</title></head><body>' + html + '</body></html>');
+      win.document.close();
+      win.print();
+    }
+  
+    async function logout() {
+      const res = await fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = "/";
+      } else {
+        alert("Logout failed");
+      }
+    }
+
+    document.getElementById('image-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('productImage');
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const filename = file.name.toLowerCase();
+      const knownSKUs = ['sunlight', 'maize', 'coke', 'cola', 'soap', 'cc2l002', 'mm5kg001'];
+
+      let match = knownSKUs.find(sku => filename.includes(sku));
+      if (match) {
+        document.getElementById('checkoutSku').value = match.toUpperCase();
+        document.getElementById('scan-result').textContent = `Matched to SKU: ${match.toUpperCase()}`;
+      } else {
+        document.getElementById('scan-result').textContent = 'No match found.';
+      }
+    });
+
+</script>
+
+</body>
+</html>
